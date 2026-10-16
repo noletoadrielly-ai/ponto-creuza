@@ -131,6 +131,7 @@ const firebaseConfig = {
 /* Regras padrão (LC 150/2015). Tudo pode ser ajustado na aba "Ajustes". */
 const CONFIG_PADRAO = {
   nomeEmpregador: "",
+  nomeFuncionaria: "",
   // minutos contratados por dia da semana: dom, seg, ter, qua, qui, sex, sáb
   cargaDia: [0, 480, 480, 480, 480, 480, 240],
   toleranciaMin: 0,
@@ -167,6 +168,9 @@ const getPos = () => new Promise((res, rej) => {
 });
 
 /* ============================== estado ============================== */
+const FUNC_ID = "funcionaria";                  // identificador fixo da funcionária (um único posto de trabalho)
+const modoAdmin = () => location.hash === "#admin"; // painel do responsável: link + #admin
+window.addEventListener("hashchange", () => location.reload());
 let user = null, perfil = null, config = { ...CONFIG_PADRAO };
 let alvoUid = null, funcionarias = [];
 let mes = dKey(new Date()).slice(0, 7);
@@ -179,7 +183,7 @@ function telaLogin(erro = "") {
   $("#app").innerHTML = `
   <div class="wrap narrow stack" style="padding-top:8vh">
     <h1>Ponto Doméstica</h1>
-    <p class="muted">Entre com o e-mail e a senha que a pessoa responsável cadastrou para você.</p>
+    <p class="muted">Área do responsável. Entre com o seu e-mail e senha.</p>
     <form id="fLogin" class="card stack">
       <div><label for="em">E-mail</label><input id="em" type="email" autocomplete="username" required></div>
       <div><label for="pw">Senha</label><input id="pw" type="password" autocomplete="current-password" required></div>
@@ -190,27 +194,37 @@ function telaLogin(erro = "") {
   $("#fLogin").onsubmit = async e => {
     e.preventDefault();
     try { await auth.signInWithEmailAndPassword($("#em").value.trim(), $("#pw").value); }
-    catch (err) { telaLogin("E-mail ou senha incorretos."); }
+    catch (err) {
+      const m = { "auth/unauthorized-domain": "Este endereço ainda não foi liberado no Firebase (Domínios autorizados).",
+        "auth/operation-not-allowed": "Login por e-mail/senha não está ativado no Firebase.",
+        "auth/too-many-requests": "Muitas tentativas. Aguarde alguns minutos." }[err.code];
+      telaLogin(m || "E-mail ou senha incorretos, ou usuário ainda não criado no Firebase.");
+    }
   };
 }
 
 auth.onAuthStateChanged(async u => {
   unsub.forEach(f => f()); unsub = [];
   user = u; perfil = null;
-  if (!u) return telaLogin();
+  if (!u) {
+    if (modoAdmin()) return telaLogin();
+    try { await auth.signInAnonymously(); } catch (e) { console.error(e); telaErro("Não foi possível iniciar. Verifique a internet."); }
+    return;
+  }
   try {
-    const p = await db.collection("usuarios").doc(u.uid).get();
-    if (!p.exists) return telaSemPerfil();
-    perfil = { uid: u.uid, ...p.data() };
     const c = await db.collection("config").doc("geral").get();
     config = { ...CONFIG_PADRAO, ...(c.exists ? c.data() : {}) };
-    if (perfil.papel === "admin") {
-      const q = await db.collection("usuarios").where("papel", "==", "funcionaria").get();
-      funcionarias = q.docs.map(d => ({ uid: d.id, ...d.data() }));
-      alvoUid = funcionarias[0]?.uid || null;
+    if (modoAdmin()) {
+      if (u.isAnonymous) return telaLogin();
+      const p = await db.collection("usuarios").doc(u.uid).get();
+      if (!p.exists || p.data().papel !== "admin") return telaSemPerfil();
+      perfil = { uid: u.uid, ...p.data() };
+      alvoUid = FUNC_ID;
+      funcionarias = [{ uid: FUNC_ID, nome: config.nomeFuncionaria || "Funcionária" }];
       aba = "mes";
     } else {
-      alvoUid = u.uid;
+      perfil = { uid: u.uid, papel: "funcionaria", nome: config.nomeFuncionaria || "" };
+      alvoUid = FUNC_ID;
     }
     ouvir();
   } catch (err) { console.error(err); telaErro("Não foi possível carregar os dados. Verifique a internet e as regras do Firestore."); }
@@ -219,7 +233,7 @@ auth.onAuthStateChanged(async u => {
 function telaSemPerfil() {
   $("#app").innerHTML = `<div class="wrap narrow stack" style="padding-top:8vh">
     <h1>Conta sem perfil</h1>
-    <p>Sua conta existe, mas ainda não foi liberada. Peça à pessoa responsável para cadastrar seu perfil.</p>
+    <p>Sua conta existe, mas ainda não é de responsável. No Firestore, crie o documento em <b>usuarios</b> com este código e o campo <b>papel</b> = <b>admin</b>.</p>
     <p class="small muted">Código da conta: <b>${esc(user.uid)}</b></p>
     <button class="btn ghost" onclick="auth.signOut()">Sair</button></div>`;
 }
@@ -300,9 +314,9 @@ function render() {
   if (perfil.papel === "admin") renderAdmin(); else renderFunc();
 }
 
-function topbar(titulo) {
+function topbar(titulo, sair = true) {
   return `<div class="topbar no-print"><strong>${esc(titulo)}</strong>
-  <span><span class="small">${esc(perfil.nome || user.email)}</span> <button class="btn plain" onclick="auth.signOut()">Sair</button></span></div>`;
+  ${sair ? `<span><span class="small">${esc(perfil.nome || user.email)}</span> <button class="btn plain" onclick="auth.signOut()">Sair</button></span>` : ""}</div>`;
 }
 
 /* ---------- Funcionária ---------- */
@@ -314,7 +328,7 @@ function renderFunc() {
   const proximo = SEQ[ativos.length];
   const { linhas, tot } = calcMes();
   const dir = $("#msgPonto")?.outerHTML || "";
-  $("#app").innerHTML = `${topbar("Ponto")}
+  $("#app").innerHTML = `${topbar("Ponto" + (config.nomeFuncionaria ? " · " + config.nomeFuncionaria : ""), false)}
   <div class="wrap narrow stack">
     <div><div class="clock" id="relogio">--:--:--</div>
     <div class="date-line">${new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}</div></div>
@@ -363,7 +377,7 @@ async function bater(tipo, ativos) {
   const agora = new Date();
   try {
     await db.collection("registros").add({
-      uid: user.uid, date: dKey(agora), mes: dKey(agora).slice(0, 7), ts: agora.getTime(), tipo, origem: "app",
+      uid: FUNC_ID, date: dKey(agora), mes: dKey(agora).slice(0, 7), ts: agora.getTime(), tipo, origem: "app",
       lat: geo ? geo.lat : null, lng: geo ? geo.lng : null, dist, anulado: false,
       criadoEm: firebase.firestore.FieldValue.serverTimestamp()
     });
@@ -492,7 +506,10 @@ function renderAjustes() {
   $("#conteudo").innerHTML = `<div class="stack">
     <form id="fCfg" class="card stack">
       <h2>Jornada e regras</h2>
-      <div><label for="cEmp">Nome do empregador (aparece na folha impressa)</label><input id="cEmp" value="${esc(c.nomeEmpregador)}"></div>
+      <div class="grid2">
+        <div><label for="cFun">Nome da funcionária</label><input id="cFun" value="${esc(c.nomeFuncionaria)}"></div>
+        <div><label for="cEmp">Nome do empregador (folha impressa)</label><input id="cEmp" value="${esc(c.nomeEmpregador)}"></div>
+      </div>
       <div><label>Horas contratadas por dia (em minutos)</label>
         <div class="days7">${DOW.map((d, i) => `<div><label for="cd${i}">${d}</label><input id="cd${i}" type="number" min="0" max="600" step="5" value="${c.cargaDia[i]}"></div>`).join("")}</div>
         <p class="small muted">Exemplo: 480 = 8h, 240 = 4h, 0 = folga. A soma da semana não pode passar de 2640 (44h).</p></div>
@@ -513,16 +530,11 @@ function renderAjustes() {
       <button class="btn" type="submit">Salvar ajustes</button>
     </form>
 
-    <form id="fPerfil" class="card stack">
-      <h2>Cadastrar funcionária</h2>
-      <p class="small muted">1) No Console do Firebase, vá em Authentication, Usuários, Adicionar usuário (e-mail e senha). 2) Copie o UID do usuário criado e cole abaixo.</p>
-      <div class="grid2">
-        <div><label for="pUid">UID</label><input id="pUid" required></div>
-        <div><label for="pNome">Nome</label><input id="pNome" required></div>
-      </div>
-      <button class="btn" type="submit">Cadastrar perfil</button>
-      ${funcionarias.length ? `<p class="small muted">Já cadastradas: ${funcionarias.map(x => esc(x.nome)).join(", ")}</p>` : ""}
-    </form></div>`;
+    <div class="card stack">
+      <h2>Link da funcionária</h2>
+      <p class="small muted">É este endereço que ela abre no celular. Não precisa de login: é só entrar e bater o ponto.</p>
+      <input readonly value="${esc(location.origin + location.pathname)}" onclick="this.select()">
+    </div></div>`;
   $("#btnLoc").onclick = async () => {
     try { const p = await getPos(); $("#cLat").value = p.lat.toFixed(6); $("#cLng").value = p.lng.toFixed(6);
       $("#cfgMsg").innerHTML = `<div class="msg ok">Localização capturada (precisão de ${Math.round(p.prec)} m). Salve os ajustes.</div>`; }
@@ -532,19 +544,13 @@ function renderAjustes() {
     e.preventDefault();
     const carga = DOW.map((_, i) => Number($(`#cd${i}`).value) || 0);
     if (carga.reduce((a, b) => a + b, 0) > 2640) { $("#cfgMsg").innerHTML = `<div class="msg erro">A soma semanal passa de 44h (2640 min). Ajuste os dias.</div>`; return; }
-    const nova = { nomeEmpregador: $("#cEmp").value.trim(), cargaDia: carga, toleranciaMin: Number($("#cTol").value) || 0,
+    const nova = { nomeEmpregador: $("#cEmp").value.trim(), nomeFuncionaria: $("#cFun").value.trim(), cargaDia: carga, toleranciaMin: Number($("#cTol").value) || 0,
       intervaloMin: Number($("#cInt").value) || 60, exigirGeo: $("#cGeo").checked, raioM: Number($("#cRaio").value) || 150,
       lat: $("#cLat").value === "" ? null : Number($("#cLat").value), lng: $("#cLng").value === "" ? null : Number($("#cLng").value) };
     await db.collection("config").doc("geral").set(nova);
     config = { ...CONFIG_PADRAO, ...nova };
+    funcionarias = [{ uid: FUNC_ID, nome: nova.nomeFuncionaria || "Funcionária" }];
     $("#cfgMsg").innerHTML = `<div class="msg ok">Ajustes salvos.</div>`;
-  };
-  $("#fPerfil").onsubmit = async e => {
-    e.preventDefault();
-    const uid = $("#pUid").value.trim(), nome = $("#pNome").value.trim();
-    await db.collection("usuarios").doc(uid).set({ papel: "funcionaria", nome });
-    funcionarias.push({ uid, nome, papel: "funcionaria" }); if (!alvoUid) alvoUid = uid;
-    renderAjustes();
   };
 }
 </script>
