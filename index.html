@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ponto Doméstica</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#eef2f5; --surface:#ffffff; --ink:#16212e; --muted:#5b6b7b; --line:#d6dee6;
+  --primary:#1d4e89; --primary-ink:#ffffff; --ok:#2a7f62; --warn:#b7791f; --danger:#b42318;
+  --ok-bg:#e4f3ed; --warn-bg:#fbf1dc; --danger-bg:#fbe7e4;
+  --font:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:17px;line-height:1.45;
+  padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0)}
+h1,h2,h3{margin:0;line-height:1.2}
+h1{font-size:1.5rem} h2{font-size:1.2rem} h3{font-size:1.05rem}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid #f5a623;outline-offset:2px}
+.wrap{max-width:1100px;margin:0 auto;padding:16px}
+.narrow{max-width:520px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px}
+.stack>*+*{margin-top:14px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.between{justify-content:space-between}
+.muted{color:var(--muted)}
+.small{font-size:.9rem}
+label{display:block;font-weight:700;margin-bottom:4px}
+input,select,textarea{width:100%;padding:11px 12px;border:1.5px solid var(--line);border-radius:8px;background:#fff}
+input[type=checkbox]{width:auto}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:8px;padding:11px 16px;
+  background:var(--primary);color:var(--primary-ink);font-weight:700;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--primary);border:1.5px solid var(--primary)}
+.btn.plain{background:transparent;color:var(--muted);padding:6px 8px;font-weight:400;text-decoration:underline}
+.btn.danger{background:var(--danger)}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.topbar{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 16px;background:var(--ink);color:#fff}
+.topbar .btn.plain{color:#cfd8e3}
+
+/* Tela da funcionária */
+.clock{font-size:clamp(3rem,16vw,5.5rem);font-weight:700;letter-spacing:.02em;text-align:center;font-variant-numeric:tabular-nums}
+.date-line{text-align:center;text-transform:capitalize;color:var(--muted)}
+.punch{width:100%;min-height:96px;font-size:1.5rem;border-radius:16px;background:var(--primary);color:#fff;border:0;font-weight:700;cursor:pointer;
+  box-shadow:0 6px 0 #123660;transition:transform .08s, box-shadow .08s}
+.punch:active{transform:translateY(4px);box-shadow:0 2px 0 #123660}
+.punch:disabled{background:#8a98a8;box-shadow:0 6px 0 #6d7a89;cursor:not-allowed}
+.msg{padding:12px 14px;border-radius:8px;font-weight:700}
+.msg.ok{background:var(--ok-bg);color:#145a43}
+.msg.erro{background:var(--danger-bg);color:#8a1a10}
+.msg.info{background:#e6eef7;color:#173a66}
+.timeline{list-style:none;margin:0;padding:0}
+.timeline li{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line)}
+.timeline li:last-child{border-bottom:0}
+.timeline .t{font-weight:700;font-variant-numeric:tabular-nums}
+.timeline .anulado{text-decoration:line-through;color:var(--muted)}
+
+/* Cards de resumo */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.kpi b{display:block;font-size:1.5rem;font-variant-numeric:tabular-nums}
+.kpi span{color:var(--muted);font-size:.9rem}
+.kpi.pos b{color:var(--ok)} .kpi.neg b{color:var(--danger)}
+
+/* Tabela */
+.tablewrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:12px}
+table{border-collapse:collapse;width:100%;min-width:780px}
+th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;font-variant-numeric:tabular-nums}
+th{background:#f3f6f9;font-size:.88rem;position:sticky;top:0}
+tr.weekend td{background:#fafbfc}
+tr.off td{background:#f0f3f6;color:var(--muted)}
+tr.hoje td{box-shadow:inset 0 0 0 2px #f5a623}
+td.num{text-align:right;white-space:nowrap}
+.chip{display:inline-block;padding:2px 8px;border-radius:99px;background:#e8edf2;margin:0 4px 4px 0;font-size:.92rem;border:0;cursor:pointer}
+.chip.anulado{text-decoration:line-through;color:var(--muted);cursor:default}
+.chip.manual{background:var(--warn-bg)}
+.alert{display:block;font-size:.85rem;color:var(--danger);font-weight:700}
+.alerts{background:var(--warn-bg);border:1px solid #ecd49a;border-radius:10px;padding:12px 14px}
+.alerts ul{margin:6px 0 0;padding-left:20px}
+select.status{padding:5px 6px;width:auto;font-size:.9rem}
+
+.tabs{display:flex;gap:6px;border-bottom:2px solid var(--line)}
+.tabs button{background:transparent;border:0;padding:10px 14px;font-weight:700;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px}
+.tabs button[aria-selected=true]{color:var(--primary);border-bottom-color:var(--primary)}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.days7{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.days7 input{padding:8px 4px;text-align:center}
+.days7 label{text-align:center;font-size:.85rem}
+dialog{border:0;border-radius:12px;padding:20px;max-width:440px;width:calc(100% - 32px)}
+dialog::backdrop{background:rgba(10,20,30,.5)}
+.print-only{display:none}
+
+@media print{
+  body{background:#fff;font-size:12px}
+  .topbar,.no-print,.tabs,.btn,select.status{display:none!important}
+  .print-only{display:block}
+  .tablewrap{border:0;overflow:visible}
+  table{min-width:0}
+  th{position:static}
+  .sign{display:flex;gap:40px;margin-top:48px}
+  .sign div{flex:1;border-top:1px solid #000;padding-top:4px;text-align:center}
+}
+@media (prefers-reduced-motion:reduce){.punch{transition:none}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<dialog id="dlg"></dialog>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+/* =====================================================================
+   1) COLE AQUI A CONFIGURAÇÃO DO SEU PROJETO FIREBASE
+      (Console Firebase > Configurações do projeto > Seus apps > Web)
+   ===================================================================== */
+const firebaseConfig = {
+  apiKey: "AIzaSyDA4_RGP4Zm4_mTn8MQxiJmpOivR-UZ-ow",
+  authDomain: "ponto-creuza.firebaseapp.com",
+  projectId: "ponto-creuza",
+  storageBucket: "ponto-creuza.firebasestorage.app",
+  messagingSenderId: "1013575474398",
+  appId: "1:1013575474398:web:0f00ddc799340be343f64f"
+};
+
+/* Regras padrão (LC 150/2015). Tudo pode ser ajustado na aba "Ajustes". */
+const CONFIG_PADRAO = {
+  nomeEmpregador: "",
+  // minutos contratados por dia da semana: dom, seg, ter, qua, qui, sex, sáb
+  cargaDia: [0, 480, 480, 480, 480, 480, 240],
+  toleranciaMin: 0,
+  intervaloMin: 60,      // 60 = 1h. Use 30 só se houver acordo escrito.
+  exigirGeo: true,
+  raioM: 150,
+  lat: null,
+  lng: null
+};
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+/* ============================ utilidades ============================ */
+const $ = (s, el = document) => el.querySelector(s);
+const pad = n => String(n).padStart(2, "0");
+const dKey = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const hhmm = ts => { const d = new Date(ts); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+const hm = m => { const s = m < 0 ? "-" : ""; m = Math.abs(Math.round(m)); return s + pad(Math.floor(m / 60)) + ":" + pad(m % 60); };
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const DOW = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+const DOW_LONGO = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+const TIPOS = { entrada: "Entrada", saida_almoco: "Saída para o almoço", volta_almoco: "Volta do almoço", saida: "Saída" };
+const SEQ = Object.keys(TIPOS);
+const STATUS = { normal: "Normal", folga: "Folga", feriado: "Feriado", atestado: "Atestado", falta: "Falta" };
+const mesLabel = m => { const [y, mo] = m.split("-").map(Number); const s = new Date(y, mo - 1, 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" }); return s.charAt(0).toUpperCase() + s.slice(1); };
+const mesMais = (m, n) => { const [y, mo] = m.split("-").map(Number); const d = new Date(y, mo - 1 + n, 1); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; };
+const haversine = (a, b, c, d) => { const R = 6371000, r = x => x * Math.PI / 180; const dLa = r(c - a), dLo = r(d - b);
+  const h = Math.sin(dLa / 2) ** 2 + Math.cos(r(a)) * Math.cos(r(c)) * Math.sin(dLo / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(h)); };
+const getPos = () => new Promise((res, rej) => {
+  if (!navigator.geolocation) return rej(new Error("sem geolocalização"));
+  navigator.geolocation.getCurrentPosition(p => res({ lat: p.coords.latitude, lng: p.coords.longitude, prec: p.coords.accuracy }), rej, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+});
+
+/* ============================== estado ============================== */
+let user = null, perfil = null, config = { ...CONFIG_PADRAO };
+let alvoUid = null, funcionarias = [];
+let mes = dKey(new Date()).slice(0, 7);
+let regs = [], dias = {};
+let unsub = [], aba = "mes", relogioTimer = null;
+
+/* ============================== login =============================== */
+function telaLogin(erro = "") {
+  clearInterval(relogioTimer);
+  $("#app").innerHTML = `
+  <div class="wrap narrow stack" style="padding-top:8vh">
+    <h1>Ponto Doméstica</h1>
+    <p class="muted">Entre com o e-mail e a senha que a pessoa responsável cadastrou para você.</p>
+    <form id="fLogin" class="card stack">
+      <div><label for="em">E-mail</label><input id="em" type="email" autocomplete="username" required></div>
+      <div><label for="pw">Senha</label><input id="pw" type="password" autocomplete="current-password" required></div>
+      ${erro ? `<div class="msg erro">${esc(erro)}</div>` : ""}
+      <button class="btn" type="submit">Entrar</button>
+    </form>
+  </div>`;
+  $("#fLogin").onsubmit = async e => {
+    e.preventDefault();
+    try { await auth.signInWithEmailAndPassword($("#em").value.trim(), $("#pw").value); }
+    catch (err) { telaLogin("E-mail ou senha incorretos."); }
+  };
+}
+
+auth.onAuthStateChanged(async u => {
+  unsub.forEach(f => f()); unsub = [];
+  user = u; perfil = null;
+  if (!u) return telaLogin();
+  try {
+    const p = await db.collection("usuarios").doc(u.uid).get();
+    if (!p.exists) return telaSemPerfil();
+    perfil = { uid: u.uid, ...p.data() };
+    const c = await db.collection("config").doc("geral").get();
+    config = { ...CONFIG_PADRAO, ...(c.exists ? c.data() : {}) };
+    if (perfil.papel === "admin") {
+      const q = await db.collection("usuarios").where("papel", "==", "funcionaria").get();
+      funcionarias = q.docs.map(d => ({ uid: d.id, ...d.data() }));
+      alvoUid = funcionarias[0]?.uid || null;
+      aba = "mes";
+    } else {
+      alvoUid = u.uid;
+    }
+    ouvir();
+  } catch (err) { console.error(err); telaErro("Não foi possível carregar os dados. Verifique a internet e as regras do Firestore."); }
+});
+
+function telaSemPerfil() {
+  $("#app").innerHTML = `<div class="wrap narrow stack" style="padding-top:8vh">
+    <h1>Conta sem perfil</h1>
+    <p>Sua conta existe, mas ainda não foi liberada. Peça à pessoa responsável para cadastrar seu perfil.</p>
+    <p class="small muted">Código da conta: <b>${esc(user.uid)}</b></p>
+    <button class="btn ghost" onclick="auth.signOut()">Sair</button></div>`;
+}
+function telaErro(m) {
+  $("#app").innerHTML = `<div class="wrap narrow stack" style="padding-top:8vh"><div class="msg erro">${esc(m)}</div>
+  <button class="btn ghost" onclick="auth.signOut()">Sair</button></div>`;
+}
+
+/* ===================== dados em tempo real ========================== */
+function ouvir() {
+  unsub.forEach(f => f()); unsub = [];
+  regs = []; dias = {};
+  if (!alvoUid) return render();
+  const err = e => { console.error(e); telaErro("Erro ao ler os registros: " + e.message); };
+  unsub.push(db.collection("registros").where("uid", "==", alvoUid).where("mes", "==", mes)
+    .onSnapshot(s => { regs = s.docs.map(d => ({ id: d.id, ...d.data() })); if (aba === "mes" || perfil.papel !== "admin") render(); }, err));
+  unsub.push(db.collection("dias").where("uid", "==", alvoUid).where("mes", "==", mes)
+    .onSnapshot(s => { dias = {}; s.docs.forEach(d => dias[d.data().date] = d.data()); if (aba === "mes" || perfil.papel !== "admin") render(); }, err));
+}
+
+/* ============================ cálculo =============================== */
+function noturnoMin(a, b) {
+  const d0 = new Date(a); d0.setHours(0, 0, 0, 0); const base = d0.getTime(), H = 3600000;
+  const janelas = [[base, base + 5 * H], [base + 22 * H, base + 29 * H]];
+  return janelas.reduce((t, [x, y]) => t + Math.max(0, Math.min(b, y) - Math.max(a, x)), 0) / 60000;
+}
+
+function calcMes() {
+  const [Y, M] = mes.split("-").map(Number), n = new Date(Y, M, 0).getDate();
+  const hojeK = dKey(new Date()), tol = Number(config.toleranciaMin) || 0;
+  const linhas = [], tot = { w: 0, extra: 0, falta: 0, not: 0, feriadoTrab: 0 };
+  for (let d = 1; d <= n; d++) {
+    const date = `${mes}-${pad(d)}`, dow = new Date(Y, M - 1, d).getDay();
+    const todos = regs.filter(r => r.date === date).sort((a, b) => a.ts - b.ts);
+    const at = todos.filter(r => !r.anulado);
+    const st = dias[date]?.status || "normal", obs = dias[date]?.obs || "";
+    const futuro = date > hojeK, ehHoje = date === hojeK;
+    const carga = (st === "folga" || st === "feriado") ? 0 : (Number(config.cargaDia[dow]) || 0);
+    let w = 0, not = 0; const alertas = [];
+    for (let i = 0; i + 1 < at.length; i += 2) { w += (at[i + 1].ts - at[i].ts) / 60000; not += noturnoMin(at[i].ts, at[i + 1].ts); }
+    if (at.length % 2 === 1 && !ehHoje && !futuro) alertas.push("Registro incompleto");
+    const intervalo = at.length >= 3 ? (at[2].ts - at[1].ts) / 60000 : null;
+    if (intervalo !== null && w > 360 && intervalo < Number(config.intervaloMin)) alertas.push(`Intervalo de ${hm(intervalo)} (mínimo ${hm(config.intervaloMin)})`);
+    const trabalhouEmFolga = (st === "folga" || st === "feriado") && w > 0;
+    if (st === "atestado") w = carga;
+    if (st === "falta") w = 0;
+    let extra = 0, falta = 0;
+    if (!futuro) {
+      const net = w - carga;
+      if (net > tol) extra = net;
+      else if (-net > tol && !ehHoje && st !== "atestado") falta = -net;
+    }
+    if (!futuro) { tot.w += w; tot.extra += extra; tot.falta += falta; tot.not += not; if (trabalhouEmFolga && st === "feriado") tot.feriadoTrab += w; }
+    linhas.push({ date, d, dow, st, obs, todos, at, carga, w, extra, falta, not, alertas, futuro, ehHoje, trabalhouEmFolga });
+  }
+  // interjornada (mínimo 11h entre o fim de um dia e o começo do próximo)
+  for (let i = 1; i < linhas.length; i++) {
+    const a = linhas[i - 1].at, b = linhas[i].at;
+    if (a.length && b.length) {
+      const gap = (b[0].ts - a[a.length - 1].ts) / 60000;
+      if (gap < 660) linhas[i].alertas.push(`Descanso de ${hm(gap)} desde o dia anterior (mínimo 11:00)`);
+    }
+  }
+  // limite semanal de 44h (somente semanas inteiras dentro do mês)
+  const semanas = {};
+  linhas.forEach(l => { if (l.futuro) return; const dt = new Date(Y, M - 1, l.d); const seg = new Date(dt); seg.setDate(dt.getDate() - ((dt.getDay() + 6) % 7));
+    const k = dKey(seg); (semanas[k] ||= { seg, w: 0, dias: 0 }); semanas[k].w += l.w; semanas[k].dias++; });
+  const alertasSemana = [];
+  Object.values(semanas).forEach(s => { const fim = new Date(s.seg); fim.setDate(s.seg.getDate() + 6);
+    const dentro = s.seg.getMonth() === M - 1 && fim.getMonth() === M - 1 && s.dias === 7;
+    if (dentro && s.w > 44 * 60) alertasSemana.push(`Semana de ${pad(s.seg.getDate())}/${pad(M)}: ${hm(s.w)} trabalhadas (limite de 44:00)`); });
+  return { linhas, tot, alertasSemana };
+}
+
+/* ============================== telas =============================== */
+function render() {
+  if (!perfil) return;
+  if (perfil.papel === "admin") renderAdmin(); else renderFunc();
+}
+
+function topbar(titulo) {
+  return `<div class="topbar no-print"><strong>${esc(titulo)}</strong>
+  <span><span class="small">${esc(perfil.nome || user.email)}</span> <button class="btn plain" onclick="auth.signOut()">Sair</button></span></div>`;
+}
+
+/* ---------- Funcionária ---------- */
+function renderFunc() {
+  const hojeK = dKey(new Date());
+  if (mes !== hojeK.slice(0, 7)) { mes = hojeK.slice(0, 7); return ouvir(); }
+  const hoje = regs.filter(r => r.date === hojeK).sort((a, b) => a.ts - b.ts);
+  const ativos = hoje.filter(r => !r.anulado);
+  const proximo = SEQ[ativos.length];
+  const { linhas, tot } = calcMes();
+  const dir = $("#msgPonto")?.outerHTML || "";
+  $("#app").innerHTML = `${topbar("Ponto")}
+  <div class="wrap narrow stack">
+    <div><div class="clock" id="relogio">--:--:--</div>
+    <div class="date-line">${new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}</div></div>
+    ${proximo
+      ? `<button id="btnPonto" class="punch">Registrar: ${TIPOS[proximo]}</button>`
+      : `<div class="msg ok">Jornada de hoje encerrada. Bom descanso!</div>`}
+    ${dir || `<div id="msgPonto"></div>`}
+    <div class="card">
+      <h2>Hoje</h2>
+      ${hoje.length ? `<ul class="timeline">${hoje.map(r => `<li class="${r.anulado ? "anulado" : ""}"><span>${TIPOS[r.tipo] || r.tipo}</span><span class="t">${hhmm(r.ts)}</span></li>`).join("")}</ul>`
+        : `<p class="muted">Nenhum registro ainda. Toque no botão azul ao chegar.</p>`}
+    </div>
+    <div class="card stack">
+      <h2>${mesLabel(mes)}</h2>
+      <div class="kpis">
+        <div class="kpi"><b>${hm(tot.w)}</b><span>Horas trabalhadas</span></div>
+        <div class="kpi"><b>${hm(tot.extra)}</b><span>Horas extras</span></div>
+      </div>
+      <details><summary>Ver dia a dia</summary>
+        <ul class="timeline">${linhas.filter(l => !l.futuro && (l.at.length || l.st !== "normal")).reverse().map(l =>
+          `<li><span>${pad(l.d)}/${mes.slice(5)} ${DOW[l.dow]}${l.st !== "normal" ? ` (${STATUS[l.st].toLowerCase()})` : ""}</span><span class="t">${l.at.map(p => hhmm(p.ts)).join(" ") || "-"}</span></li>`).join("") || `<li class="muted">Sem registros neste mês.</li>`}</ul>
+      </details>
+    </div>
+  </div>`;
+  const tick = () => { const el = $("#relogio"); if (el) { const d = new Date(); el.textContent = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; } };
+  tick(); clearInterval(relogioTimer); relogioTimer = setInterval(tick, 1000);
+  const b = $("#btnPonto"); if (b) b.onclick = () => bater(proximo, ativos);
+}
+
+function setMsg(t, tipo = "info") { const el = $("#msgPonto"); if (el) el.outerHTML = t ? `<div id="msgPonto" class="msg ${tipo}">${esc(t)}</div>` : `<div id="msgPonto"></div>`; }
+
+async function bater(tipo, ativos) {
+  const btn = $("#btnPonto"); btn.disabled = true;
+  const ult = ativos[ativos.length - 1];
+  if (ult && Date.now() - ult.ts < 60000) { setMsg("Você acabou de registrar. Aguarde 1 minuto.", "erro"); btn.disabled = false; return; }
+  setMsg("Verificando sua localização...", "info");
+  let geo = null, dist = null;
+  try { geo = await getPos(); } catch (e) {
+    if (config.exigirGeo) { setMsg("Não consegui ver sua localização. Ative o GPS, permita o acesso do navegador e tente de novo.", "erro"); btn.disabled = false; return; }
+  }
+  if (config.exigirGeo) {
+    if (config.lat == null || config.lng == null) { setMsg("O local da casa ainda não foi configurado. Avise a pessoa responsável.", "erro"); btn.disabled = false; return; }
+    dist = Math.round(haversine(geo.lat, geo.lng, config.lat, config.lng));
+    if (dist > Number(config.raioM)) { setMsg(`Você está a ${dist} m da casa. O registro só vale dentro de ${config.raioM} m.`, "erro"); btn.disabled = false; return; }
+  } else if (geo && config.lat != null) dist = Math.round(haversine(geo.lat, geo.lng, config.lat, config.lng));
+  const agora = new Date();
+  try {
+    await db.collection("registros").add({
+      uid: user.uid, date: dKey(agora), mes: dKey(agora).slice(0, 7), ts: agora.getTime(), tipo, origem: "app",
+      lat: geo ? geo.lat : null, lng: geo ? geo.lng : null, dist, anulado: false,
+      criadoEm: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    setMsg(`${TIPOS[tipo]} registrada às ${hhmm(agora.getTime())}.`, "ok");
+  } catch (e) {
+    console.error(e);
+    setMsg("Não foi possível salvar. Verifique a internet e se o relógio do celular está certo.", "erro"); btn.disabled = false;
+  }
+}
+
+/* ---------- Responsável ---------- */
+function renderAdmin() {
+  clearInterval(relogioTimer);
+  const f = funcionarias.find(x => x.uid === alvoUid);
+  $("#app").innerHTML = `${topbar("Ponto Doméstica · Painel")}
+  <div class="wrap stack">
+    <div class="tabs no-print" role="tablist">
+      <button role="tab" aria-selected="${aba === "mes"}" onclick="trocaAba('mes')">Controle mensal</button>
+      <button role="tab" aria-selected="${aba === "ajustes"}" onclick="trocaAba('ajustes')">Ajustes</button>
+    </div>
+    <div id="conteudo"></div>
+  </div>`;
+  if (aba === "mes") renderMes(f); else renderAjustes();
+}
+function trocaAba(a) { aba = a; renderAdmin(); }
+
+function renderMes(f) {
+  const box = $("#conteudo");
+  if (!f) { box.innerHTML = `<div class="card"><p>Nenhuma funcionária cadastrada ainda. Vá em <b>Ajustes</b> e cadastre o perfil dela.</p></div>`; return; }
+  const { linhas, tot, alertasSemana } = calcMes();
+  const saldo = tot.extra - tot.falta, exced = Math.max(0, tot.extra - 2400);
+  const todosAlertas = [...alertasSemana, ...linhas.flatMap(l => l.alertas.map(a => `Dia ${pad(l.d)}: ${a}`))];
+  box.innerHTML = `<div class="stack">
+    <div class="row between no-print">
+      <div class="row">
+        <button class="btn ghost" onclick="mudaMes(-1)" aria-label="Mês anterior">&lsaquo;</button>
+        <h2 style="min-width:170px;text-align:center">${mesLabel(mes)}</h2>
+        <button class="btn ghost" onclick="mudaMes(1)" aria-label="Próximo mês">&rsaquo;</button>
+      </div>
+      <div class="row">
+        ${funcionarias.length > 1 ? `<select id="selF" style="width:auto">${funcionarias.map(x => `<option value="${x.uid}" ${x.uid === alvoUid ? "selected" : ""}>${esc(x.nome)}</option>`).join("")}</select>` : ""}
+        <button class="btn ghost" onclick="exportaCSV()">Baixar CSV</button>
+        <button class="btn" onclick="window.print()">Imprimir folha</button>
+      </div>
+    </div>
+    <div class="print-only"><h2>Folha de ponto: ${esc(f.nome)}</h2><p>${mesLabel(mes)}${config.nomeEmpregador ? " · Empregador: " + esc(config.nomeEmpregador) : ""}</p></div>
+    <div class="kpis">
+      <div class="kpi"><b>${hm(tot.w)}</b><span>Horas trabalhadas</span></div>
+      <div class="kpi"><b>${hm(tot.extra)}</b><span>Horas extras</span></div>
+      <div class="kpi"><b>${hm(tot.falta)}</b><span>Faltas e atrasos</span></div>
+      <div class="kpi ${saldo > 0 ? "pos" : saldo < 0 ? "neg" : ""}"><b>${hm(saldo)}</b><span>Saldo do mês</span></div>
+      <div class="kpi"><b>${hm(tot.not)}</b><span>Horas noturnas (22h às 5h)</span></div>
+      <div class="kpi"><b>${hm(exced)}</b><span>Extras acima de 40h (vão para o banco)</span></div>
+    </div>
+    ${todosAlertas.length ? `<div class="alerts no-print"><strong>Pontos de atenção</strong><ul>${todosAlertas.map(a => `<li>${esc(a)}</li>`).join("")}</ul></div>` : ""}
+    <div class="tablewrap"><table>
+      <thead><tr><th>Dia</th><th class="no-print">Situação</th><th>Registros</th><th class="num">Trabalhado</th><th class="num">Extra</th><th class="num">Falta</th><th class="num">Noturno</th><th class="no-print"></th></tr></thead>
+      <tbody>${linhas.map(l => `<tr class="${l.dow === 0 || l.dow === 6 ? "weekend" : ""} ${l.carga === 0 && !l.futuro ? "off" : ""} ${l.ehHoje ? "hoje" : ""}">
+        <td><b>${pad(l.d)}</b> ${DOW[l.dow]}</td>
+        <td class="no-print"><select class="status" onchange="mudaStatus('${l.date}',this.value)" aria-label="Situação do dia ${l.d}">
+          ${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${l.st === k ? "selected" : ""}>${v}</option>`).join("")}</select></td>
+        <td>${l.todos.map(p => `<button class="chip ${p.anulado ? "anulado" : ""} ${p.origem === "manual" ? "manual" : ""}" title="${esc(TIPOS[p.tipo] || p.tipo)}${p.origem === "manual" ? " (manual: " + esc(p.justificativa) + ")" : ""}${p.anulado ? " (anulado: " + esc(p.anuladoMotivo) + ")" : ""}${p.dist != null ? " · " + p.dist + " m da casa" : ""}" ${p.anulado ? "disabled" : `onclick="anular('${p.id}')"`}>${hhmm(p.ts)}</button>`).join("")}
+          ${l.st !== "normal" ? `<span class="muted small">${STATUS[l.st]}${l.trabalhouEmFolga ? " trabalhada" : ""}${l.st === "feriado" && l.trabalhouEmFolga ? " (pagar em dobro)" : ""}</span>` : ""}
+          ${l.alertas.map(a => `<span class="alert">${esc(a)}</span>`).join("")}</td>
+        <td class="num">${l.futuro ? "" : hm(l.w)}</td>
+        <td class="num">${l.extra ? hm(l.extra) : ""}</td>
+        <td class="num">${l.falta ? hm(l.falta) : ""}</td>
+        <td class="num">${l.not ? hm(l.not) : ""}</td>
+        <td class="no-print"><button class="btn plain" onclick="novoManual('${l.date}')">+ registro</button></td>
+      </tr>`).join("")}</tbody>
+    </table></div>
+    <p class="small muted no-print">Toque em um horário para anulá-lo (ele fica no histórico, riscado). Registros manuais ficam destacados e guardam a justificativa.</p>
+    <div class="print-only"><div class="sign"><div>${esc(f.nome)}</div><div>${esc(config.nomeEmpregador || "Empregador")}</div></div></div>
+  </div>`;
+  const sel = $("#selF"); if (sel) sel.onchange = e => { alvoUid = e.target.value; ouvir(); };
+}
+function mudaMes(n) { mes = mesMais(mes, n); ouvir(); }
+
+async function mudaStatus(date, st) {
+  const id = `${alvoUid}_${date}`, ref = db.collection("dias").doc(id);
+  if (st === "normal") return ref.delete();
+  const obs = ["atestado", "falta"].includes(st) ? (prompt("Observação (opcional):") || "") : "";
+  await ref.set({ uid: alvoUid, date, mes: date.slice(0, 7), status: st, obs });
+}
+
+async function anular(id) {
+  const m = prompt("Motivo para anular este registro (obrigatório):");
+  if (!m || !m.trim()) return;
+  await db.collection("registros").doc(id).update({ anulado: true, anuladoMotivo: m.trim(), anuladoPor: user.uid });
+}
+
+function novoManual(date) {
+  const dlg = $("#dlg");
+  dlg.innerHTML = `<form method="dialog" id="fMan" class="stack">
+    <h3>Registro manual: ${date.split("-").reverse().join("/")}</h3>
+    <div><label for="mTipo">Tipo</label><select id="mTipo">${SEQ.map(k => `<option value="${k}">${TIPOS[k]}</option>`).join("")}</select></div>
+    <div><label for="mHora">Horário</label><input id="mHora" type="time" required></div>
+    <div><label for="mJust">Justificativa</label><textarea id="mJust" rows="2" required placeholder="Ex.: esqueceu de registrar; celular sem bateria"></textarea></div>
+    <div class="row"><button class="btn" type="submit">Salvar registro</button><button class="btn plain" type="button" id="mCancel">Cancelar</button></div></form>`;
+  dlg.showModal();
+  $("#mCancel").onclick = () => dlg.close();
+  $("#fMan").onsubmit = async e => {
+    e.preventDefault();
+    const ts = new Date(`${date}T${$("#mHora").value}`).getTime();
+    await db.collection("registros").add({ uid: alvoUid, date, mes: date.slice(0, 7), ts, tipo: $("#mTipo").value, origem: "manual",
+      justificativa: $("#mJust").value.trim(), lat: null, lng: null, dist: null, anulado: false, criadoPor: user.uid,
+      criadoEm: firebase.firestore.FieldValue.serverTimestamp() });
+    dlg.close();
+  };
+}
+
+function exportaCSV() {
+  const { linhas } = calcMes(), f = funcionarias.find(x => x.uid === alvoUid);
+  const cab = ["Data", "Dia", "Situação", "Registros", "Trabalhado", "Extra", "Falta", "Noturno"];
+  const lin = linhas.map(l => [`${pad(l.d)}/${mes.slice(5)}/${mes.slice(0, 4)}`, DOW[l.dow], STATUS[l.st], l.at.map(p => hhmm(p.ts)).join(" "),
+    l.futuro ? "" : hm(l.w), hm(l.extra), hm(l.falta), hm(l.not)]);
+  const csv = [cab, ...lin].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(";")).join("\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" }));
+  a.download = `ponto-${(f?.nome || "funcionaria").replace(/\s+/g, "-").toLowerCase()}-${mes}.csv`; a.click();
+}
+
+/* ---------- Ajustes ---------- */
+function renderAjustes() {
+  const c = config;
+  $("#conteudo").innerHTML = `<div class="stack">
+    <form id="fCfg" class="card stack">
+      <h2>Jornada e regras</h2>
+      <div><label for="cEmp">Nome do empregador (aparece na folha impressa)</label><input id="cEmp" value="${esc(c.nomeEmpregador)}"></div>
+      <div><label>Horas contratadas por dia (em minutos)</label>
+        <div class="days7">${DOW.map((d, i) => `<div><label for="cd${i}">${d}</label><input id="cd${i}" type="number" min="0" max="600" step="5" value="${c.cargaDia[i]}"></div>`).join("")}</div>
+        <p class="small muted">Exemplo: 480 = 8h, 240 = 4h, 0 = folga. A soma da semana não pode passar de 2640 (44h).</p></div>
+      <div class="grid2">
+        <div><label for="cTol">Tolerância diária (minutos)</label><input id="cTol" type="number" min="0" max="30" value="${c.toleranciaMin}"></div>
+        <div><label for="cInt">Intervalo mínimo (minutos)</label><input id="cInt" type="number" min="30" max="240" value="${c.intervaloMin}">
+          <p class="small muted">60 por padrão. Só use 30 com acordo escrito.</p></div>
+      </div>
+      <h2>Local de trabalho</h2>
+      <label class="row"><input type="checkbox" id="cGeo" ${c.exigirGeo ? "checked" : ""}> Só permitir registro dentro do raio da casa</label>
+      <div class="grid2">
+        <div><label for="cLat">Latitude</label><input id="cLat" type="number" step="any" value="${c.lat ?? ""}"></div>
+        <div><label for="cLng">Longitude</label><input id="cLng" type="number" step="any" value="${c.lng ?? ""}"></div>
+        <div><label for="cRaio">Raio (metros)</label><input id="cRaio" type="number" min="30" max="2000" value="${c.raioM}"></div>
+      </div>
+      <div class="row"><button type="button" class="btn ghost" id="btnLoc">Usar minha localização atual (estando na casa)</button></div>
+      <div id="cfgMsg"></div>
+      <button class="btn" type="submit">Salvar ajustes</button>
+    </form>
+
+    <form id="fPerfil" class="card stack">
+      <h2>Cadastrar funcionária</h2>
+      <p class="small muted">1) No Console do Firebase, vá em Authentication, Usuários, Adicionar usuário (e-mail e senha). 2) Copie o UID do usuário criado e cole abaixo.</p>
+      <div class="grid2">
+        <div><label for="pUid">UID</label><input id="pUid" required></div>
+        <div><label for="pNome">Nome</label><input id="pNome" required></div>
+      </div>
+      <button class="btn" type="submit">Cadastrar perfil</button>
+      ${funcionarias.length ? `<p class="small muted">Já cadastradas: ${funcionarias.map(x => esc(x.nome)).join(", ")}</p>` : ""}
+    </form></div>`;
+  $("#btnLoc").onclick = async () => {
+    try { const p = await getPos(); $("#cLat").value = p.lat.toFixed(6); $("#cLng").value = p.lng.toFixed(6);
+      $("#cfgMsg").innerHTML = `<div class="msg ok">Localização capturada (precisão de ${Math.round(p.prec)} m). Salve os ajustes.</div>`; }
+    catch (e) { $("#cfgMsg").innerHTML = `<div class="msg erro">Não consegui obter a localização. Permita o acesso no navegador.</div>`; }
+  };
+  $("#fCfg").onsubmit = async e => {
+    e.preventDefault();
+    const carga = DOW.map((_, i) => Number($(`#cd${i}`).value) || 0);
+    if (carga.reduce((a, b) => a + b, 0) > 2640) { $("#cfgMsg").innerHTML = `<div class="msg erro">A soma semanal passa de 44h (2640 min). Ajuste os dias.</div>`; return; }
+    const nova = { nomeEmpregador: $("#cEmp").value.trim(), cargaDia: carga, toleranciaMin: Number($("#cTol").value) || 0,
+      intervaloMin: Number($("#cInt").value) || 60, exigirGeo: $("#cGeo").checked, raioM: Number($("#cRaio").value) || 150,
+      lat: $("#cLat").value === "" ? null : Number($("#cLat").value), lng: $("#cLng").value === "" ? null : Number($("#cLng").value) };
+    await db.collection("config").doc("geral").set(nova);
+    config = { ...CONFIG_PADRAO, ...nova };
+    $("#cfgMsg").innerHTML = `<div class="msg ok">Ajustes salvos.</div>`;
+  };
+  $("#fPerfil").onsubmit = async e => {
+    e.preventDefault();
+    const uid = $("#pUid").value.trim(), nome = $("#pNome").value.trim();
+    await db.collection("usuarios").doc(uid).set({ papel: "funcionaria", nome });
+    funcionarias.push({ uid, nome, papel: "funcionaria" }); if (!alvoUid) alvoUid = uid;
+    renderAjustes();
+  };
+}
+</script>
+</body>
+</html>
