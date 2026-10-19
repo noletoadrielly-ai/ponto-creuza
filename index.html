@@ -78,6 +78,7 @@ td.num{text-align:right;white-space:nowrap}
 .chip{display:inline-block;padding:2px 8px;border-radius:99px;background:#e8edf2;margin:0 4px 4px 0;font-size:.92rem;border:0;cursor:pointer}
 .chip.anulado{text-decoration:line-through;color:var(--muted);cursor:default}
 .chip.manual{background:var(--warn-bg)}
+.chip.editado{background:#dbe6f6;box-shadow:inset 0 0 0 1.5px #7ea1d4}
 .alert{display:block;font-size:.85rem;color:var(--danger);font-weight:700}
 .alerts{background:var(--warn-bg);border:1px solid #ecd49a;border-radius:10px;padding:12px 14px}
 .alerts ul{margin:6px 0 0;padding-left:20px}
@@ -439,7 +440,7 @@ function renderMes(f) {
         <td><b>${pad(l.d)}</b> ${DOW[l.dow]}</td>
         <td class="no-print"><select class="status" onchange="mudaStatus('${l.date}',this.value)" aria-label="Situação do dia ${l.d}">
           ${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${l.st === k ? "selected" : ""}>${v}</option>`).join("")}</select></td>
-        <td>${l.todos.map(p => `<button class="chip ${p.anulado ? "anulado" : ""} ${p.origem === "manual" ? "manual" : ""}" title="${esc(TIPOS[p.tipo] || p.tipo)}${p.origem === "manual" ? " (manual: " + esc(p.justificativa) + ")" : ""}${p.anulado ? " (anulado: " + esc(p.anuladoMotivo) + ")" : ""}${p.dist != null ? " · " + p.dist + " m da casa" : ""}" ${p.anulado ? "disabled" : `onclick="anular('${p.id}')"`}>${hhmm(p.ts)}</button>`).join("")}
+        <td>${l.todos.map(p => `<button class="chip ${p.anulado ? "anulado" : ""} ${p.origem === "manual" ? "manual" : ""} ${p.editado ? "editado" : ""}" title="${esc(TIPOS[p.tipo] || p.tipo)}${p.origem === "manual" ? " (manual: " + esc(p.justificativa) + ")" : ""}${p.editado ? " (editado, original " + hhmm(p.tsOriginal) + ": " + esc(p.editadoMotivo) + ")" : ""}${p.anulado ? " (anulado: " + esc(p.anuladoMotivo) + ")" : ""}${p.dist != null ? " · " + p.dist + " m da casa" : ""}" ${p.anulado ? "disabled" : `onclick="abrirRegistro('${p.id}')"`}>${hhmm(p.ts)}</button>`).join("")}
           ${l.st !== "normal" ? `<span class="muted small">${STATUS[l.st]}${l.trabalhouEmFolga ? " trabalhada" : ""}${l.st === "feriado" && l.trabalhouEmFolga ? " (pagar em dobro)" : ""}</span>` : ""}
           ${l.alertas.map(a => `<span class="alert">${esc(a)}</span>`).join("")}</td>
         <td class="num">${l.futuro ? "" : hm(l.w)}</td>
@@ -449,7 +450,7 @@ function renderMes(f) {
         <td class="no-print"><button class="btn plain" onclick="novoManual('${l.date}')">+ registro</button></td>
       </tr>`).join("")}</tbody>
     </table></div>
-    <p class="small muted no-print">Toque em um horário para anulá-lo (ele fica no histórico, riscado). Registros manuais ficam destacados e guardam a justificativa.</p>
+    <p class="small muted no-print">Toque em um horário para corrigir o horário ou anulá-lo. Toda alteração exige justificativa e guarda o horário original. Azul = horário editado, amarelo = lançado manualmente, riscado = anulado.</p>
     <div class="print-only"><div class="sign"><div>${esc(f.nome)}</div><div>${esc(config.nomeEmpregador || "Empregador")}</div></div></div>
   </div>`;
   const sel = $("#selF"); if (sel) sel.onchange = e => { alvoUid = e.target.value; ouvir(); };
@@ -463,10 +464,43 @@ async function mudaStatus(date, st) {
   await ref.set({ uid: alvoUid, date, mes: date.slice(0, 7), status: st, obs });
 }
 
-async function anular(id) {
-  const m = prompt("Motivo para anular este registro (obrigatório):");
-  if (!m || !m.trim()) return;
-  await db.collection("registros").doc(id).update({ anulado: true, anuladoMotivo: m.trim(), anuladoPor: user.uid });
+function abrirRegistro(id) {
+  const p = regs.find(r => r.id === id); if (!p) return;
+  const d = new Date(p.ts), hora = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const dlg = $("#dlg");
+  dlg.innerHTML = `<form method="dialog" id="fReg" class="stack">
+    <h3>Registro de ${p.date.split("-").reverse().join("/")}</h3>
+    <p class="small muted">${p.origem === "manual" ? "Lançado manualmente" : "Batido no app" + (p.dist != null ? ` a ${p.dist} m da casa` : "")}${p.editado ? ` · horário original: ${hhmm(p.tsOriginal)}` : ""}</p>
+    <div class="grid2">
+      <div><label for="eHora">Horário</label><input id="eHora" type="time" value="${hora}" required></div>
+      <div><label for="eTipo">Tipo</label><select id="eTipo">${SEQ.map(k => `<option value="${k}" ${k === p.tipo ? "selected" : ""}>${TIPOS[k]}</option>`).join("")}</select></div>
+    </div>
+    <div><label for="eJust">Justificativa (obrigatória)</label><textarea id="eJust" rows="2" required placeholder="Ex.: bateu atrasada por falha no celular; confirmado com a funcionária"></textarea></div>
+    <div class="row"><button class="btn" type="submit">Salvar alteração</button>
+      <button class="btn danger" type="button" id="eAnular">Anular registro</button>
+      <button class="btn plain" type="button" id="eCancel">Cancelar</button></div></form>`;
+  dlg.showModal();
+  $("#eCancel").onclick = () => dlg.close();
+  $("#fReg").onsubmit = async e => {
+    e.preventDefault();
+    const motivo = $("#eJust").value.trim(), tipo = $("#eTipo").value;
+    const novo = new Date(`${p.date}T${$("#eHora").value}`).getTime();
+    if (novo === p.ts && tipo === p.tipo) { dlg.close(); return; }
+    await db.collection("registros").doc(p.id).update({
+      ts: novo, tipo, editado: true,
+      tsOriginal: p.tsOriginal ?? p.ts, tipoOriginal: p.tipoOriginal ?? p.tipo,
+      editadoMotivo: motivo, editadoPor: user.uid,
+      historico: firebase.firestore.FieldValue.arrayUnion({ de: p.ts, para: novo, motivo, por: user.uid, em: Date.now() })
+    });
+    dlg.close();
+  };
+  $("#eAnular").onclick = async () => {
+    const motivo = $("#eJust").value.trim();
+    if (!motivo) { $("#eJust").reportValidity(); return; }
+    if (!confirm("Anular este registro? Ele continua no histórico, riscado, mas deixa de contar nas horas.")) return;
+    await db.collection("registros").doc(p.id).update({ anulado: true, anuladoMotivo: motivo, anuladoPor: user.uid });
+    dlg.close();
+  };
 }
 
 function novoManual(date) {
